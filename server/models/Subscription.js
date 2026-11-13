@@ -7,6 +7,9 @@ const subscriptionSchema = new mongoose.Schema({
   stripeCustomerId: { type: String, sparse: true, unique: true },
   stripeSubscriptionId: { type: String, sparse: true, unique: true },
   stripePriceId: { type: String },
+  checkoutSessionId: { type: String, sparse: true, unique: true },
+  checkoutExpiresAt: { type: Date },
+  currentPeriodStart: { type: Date },
   currentPeriodEnd: { type: Date },
   cancelAtPeriodEnd: { type: Boolean, default: false },
 }, { timestamps: true });

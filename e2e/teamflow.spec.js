@@ -12,7 +12,7 @@ test('creates an account, workspace, project, and assigned task from the UI', as
   await page.getByLabel('Workspace name').fill(`E2E Workspace ${suffix}`);
   await page.getByLabel('Password').fill('TeamFlow!2026');
   await page.getByRole('button', { name: 'Create your workspace' }).click();
-  await expect(page.getByRole('heading', { name: /Good afternoon/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/i })).toBeVisible();
 
   await page.getByRole('link', { name: 'Projects', exact: true }).click();
   await page.getByRole('button', { name: 'New project' }).click();
@@ -42,7 +42,7 @@ test('shows the responsive navigation menu on a phone-sized viewport', async ({ 
   await page.getByLabel('Workspace name').fill(`Mobile Workspace ${suffix}`);
   await page.getByLabel('Password').fill('TeamFlow!2026');
   await page.getByRole('button', { name: 'Create your workspace' }).click();
-  await expect(page.getByRole('heading', { name: /Good afternoon/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/i })).toBeVisible();
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
   await page.getByRole('link', { name: 'Analytics', exact: true }).click();

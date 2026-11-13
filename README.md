@@ -12,7 +12,7 @@ TeamFlow is a multi-tenant project management and team collaboration SaaS built 
 - User profile, organization settings, notifications, light/dark theme, loading, error, and empty states.
 - Email verification, password recovery with an emailed reset link and one-time code, strong password rules, and server-verified Cloudflare Turnstile CAPTCHA.
 - Tenant-scoped authorization, plan-enforced project and seat limits, audit history, and live notification and activity updates over authenticated Socket.IO.
-- Stripe-hosted subscription checkout and billing portal, idempotent webhook processing, plan usage summaries, and invoice history.
+- Free, Pro, and Enterprise plan management; Stripe-hosted checkout and billing portal; verified, idempotent subscription and invoice webhooks; usage limits and recorded payment history.
 - OpenAPI 3.1 reference at `/api/docs` and `/api/openapi.json`, structured redacted logs, request IDs, readiness checks, and optional Sentry error reporting.
 - Backend role checks, request validation, rate limiting, Helmet, CORS, and centralized errors.
 - Short lived JWT access tokens and rotating, hashed refresh sessions in HTTP-only cookies. Password reset tokens are hashed and single use.
@@ -169,8 +169,13 @@ npm run dev:server
 | `CLIENT_URL`, `PASSWORD_RESET_URL` | Public client URLs used in email links |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | SMTP delivery for password reset and organization invitations |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile keys; production requires real keys and rejects test keys |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe test/live secret and webhook signing secret; both are required to enable hosted checkout |
+| `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE` | Stripe Price IDs for the corresponding subscription plans |
+| `SALES_EMAIL` | Recipient for Enterprise enquiries; requires the SMTP settings above |
 
 `client/.env.example` contains `VITE_API_URL` and the public `VITE_TURNSTILE_SITE_KEY`. Local API requests use Vite's `/api/v1` proxy so the app works from localhost and a private LAN address. Local defaults use Cloudflare's test keys. Set the matching real site key in Vercel for production; keep the secret only in Render's environment settings.
+
+Stripe uses hosted Checkout, so no publishable key is needed in the browser. Configure the Stripe test secret, a webhook signing secret, and the Stripe Price ID(s) on the API. For local webhook testing, run `stripe listen --forward-to localhost:5000/api/v1/billing/webhook` and use the emitted `whsec_...` value as `STRIPE_WEBHOOK_SECRET`. Without these credentials paid checkout remains unavailable; Free plan selection and access remain available.
 
 ## Commands
 
@@ -220,11 +225,12 @@ Base path: `/api/v1`. Protected calls use the short-lived `Authorization: Bearer
 | PATCH | `/notifications/:id/read` | Mark own notification read |
 | PATCH | `/notifications/read-all` | Mark all current user's notifications read |
 | GET | `/analytics/overview` | Workspace overview for members |
-| GET | `/analytics/tasks`, `/analytics/projects`, `/analytics/team` | ADMIN/MANAGER analytics on Pro or Enterprise |
+| GET | `/analytics/tasks`, `/analytics/projects`, `/analytics/team` | ADMIN/MANAGER analytics on all plans |
 | GET | `/organizations/:id/audit-logs` | ADMIN/MANAGER paginated workspace audit history |
-| GET | `/billing/plans`, `/billing` | Public plan catalog; authenticated workspace plan and usage |
-| POST | `/billing/checkout`, `/billing/portal`, `/billing/cancel` | ADMIN subscription actions, available when Stripe is configured |
-| POST | `/billing/webhook` | Stripe-signed subscription event receiver |
+| GET | `/billing/plans`, `/billing` | Public plan catalog; authenticated workspace plan, usage, and recorded invoices |
+| POST | `/billing/free`, `/billing/checkout`, `/billing/portal`, `/billing/cancel` | ADMIN plan and subscription actions |
+| POST | `/billing/sales-enquiry` | ADMIN Enterprise enquiry delivered to configured sales email |
+| POST | `/billing/webhook` | Stripe-signed subscription and invoice event receiver |
 
 The interactive OpenAPI reference is served at [`/api/docs`](http://localhost:5000/api/docs), with the JSON document at [`/api/openapi.json`](http://localhost:5000/api/openapi.json). Workspace API calls require the `X-Organization-Id` header as well as a bearer token. Socket.IO uses the access token and verifies active membership before joining workspace rooms.
 

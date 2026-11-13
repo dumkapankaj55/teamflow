@@ -31,6 +31,9 @@
 .billing-plan-card li { display: flex; align-items: center; gap: 7px; color: #647087; font-size: 10px; }
 .billing-plan-card li svg { color: #635bff; }
 .billing-plan-card > .button { margin-top: auto; }
+.sales-enquiry-form { display: grid; gap: 10px; width: 100%; margin-top: 6px; }
+.sales-enquiry-form textarea { width: 100%; min-height: 90px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; resize: vertical; }
+.sales-enquiry-form .field-help { line-height: 1.5; }
 .billing-plan-current { border-color: #bdb8ff; box-shadow: 0 0 0 2px #635bff0d; }
 .billing-invoices { padding: 18px; }
 .billing-invoices .panel-heading { padding: 0 0 13px; }

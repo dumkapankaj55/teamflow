@@ -14,10 +14,10 @@ function transporter() {
   });
 }
 
-async function sendEmail({ to, subject, text, html }) {
+async function sendEmail({ to, subject, text, html, replyTo }) {
   const mailTransport = transporter();
   if (!mailTransport) return false;
-  await mailTransport.sendMail({ from: process.env.SMTP_FROM || 'TeamFlow <no-reply@example.com>', to, subject, text, html });
+  await mailTransport.sendMail({ from: process.env.SMTP_FROM || 'TeamFlow <no-reply@example.com>', to, subject, text, html, ...(replyTo ? { replyTo } : {}) });
   return true;
 }
 

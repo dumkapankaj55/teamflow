@@ -13,5 +13,7 @@ router.get('/', controller.summary);
 router.post('/checkout', authorizeRoles('ADMIN'), validate({ body: z.object({ plan: z.enum(['PRO', 'ENTERPRISE']) }).strict() }), controller.checkout);
 router.post('/portal', authorizeRoles('ADMIN'), controller.portal);
 router.post('/cancel', authorizeRoles('ADMIN'), controller.cancel);
+router.post('/free', authorizeRoles('ADMIN'), controller.selectFree);
+router.post('/sales-enquiry', authorizeRoles('ADMIN'), validate({ body: z.object({ message: z.string().trim().min(10).max(2000) }).strict() }), controller.enterpriseEnquiry);
 
 module.exports = router;

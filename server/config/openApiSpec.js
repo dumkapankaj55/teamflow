@@ -106,6 +106,8 @@ module.exports = {
     '/billing/checkout': { post: { tags: ['Billing'], ...operation('Create a Stripe-hosted subscription checkout (ADMIN)', { auth: true, workspace: true, roles: ['ADMIN'], body: bodyRef('CheckoutRequest'), status: 201 }) } },
     '/billing/portal': { post: { tags: ['Billing'], ...operation('Create a Stripe customer portal session (ADMIN)', { auth: true, workspace: true, roles: ['ADMIN'] }) } },
     '/billing/cancel': { post: { tags: ['Billing'], ...operation('Schedule subscription cancellation at period end (ADMIN)', { auth: true, workspace: true, roles: ['ADMIN'] }) } },
+    '/billing/free': { post: { tags: ['Billing'], ...operation('Select Free or schedule downgrade at period end (ADMIN)', { auth: true, workspace: true, roles: ['ADMIN'] }) } },
+    '/billing/sales-enquiry': { post: { tags: ['Billing'], ...operation('Send an Enterprise sales enquiry (ADMIN)', { auth: true, workspace: true, roles: ['ADMIN'], body: { type: 'object', additionalProperties: false, required: ['message'], properties: { message: { type: 'string', minLength: 10, maxLength: 2000 } } }, status: 202 }) } },
     '/billing/webhook': { post: { tags: ['Billing'], summary: 'Receive and verify Stripe webhook events', description: 'Requires the raw request body and Stripe-Signature header. Stripe event IDs are processed idempotently.', parameters: [{ name: 'Stripe-Signature', in: 'header', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Webhook event accepted.' }, '400': { description: 'Invalid signature.' } } } },
   },
   components: {

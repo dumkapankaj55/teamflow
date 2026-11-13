@@ -15,6 +15,7 @@ const Notification = require('../models/Notification');
 const ActivityLog = require('../models/ActivityLog');
 const RefreshToken = require('../models/RefreshToken');
 const StripeEvent = require('../models/StripeEvent');
+const BillingPayment = require('../models/BillingPayment');
 const Subscription = require('../models/Subscription');
 const { initializeSocket, closeSocket } = require('../services/socketService');
 const { notify } = require('../services/notificationService');
@@ -285,6 +286,35 @@ describe('TeamFlow SaaS workflows', () => {
     expect(summary.body.data.limits.members).toBe(5);
     expect(summary.body.data.usage.storageBytes).toBeNull();
     expect(summary.body.data.plan.features.storageTracking).toBe(false);
+
+    const selectedFree = await request(app).post('/api/v1/billing/free').set(headers(admin.token, admin.organization._id));
+    expect(selectedFree.status).toBe(200);
+    expect(selectedFree.body.data).toMatchObject({ plan: 'FREE', status: 'free', cancelAtPeriodEnd: false });
+    expect(await Subscription.exists({ organization: admin.organization._id, plan: 'FREE', status: 'free' })).toBeTruthy();
+  });
+
+  it('only lets workspace admins select Free and returns a clear error for unconfigured sales enquiries', async () => {
+    const admin = await register({ organizationName: 'Billing Permission Workspace' });
+    const member = await register({ organizationName: 'Billing Member Workspace' });
+    await Membership.create({ user: member.user._id, organization: admin.organization._id, role: 'MEMBER' });
+
+    const forbidden = await request(app).post('/api/v1/billing/free').set(headers(member.token, admin.organization._id));
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.body.code).toBe('FORBIDDEN');
+
+    const previousSalesEmail = process.env.SALES_EMAIL;
+    delete process.env.SALES_EMAIL;
+    let enquiry;
+    try {
+      enquiry = await request(app).post('/api/v1/billing/sales-enquiry')
+        .set(headers(admin.token, admin.organization._id))
+        .send({ message: 'We need centralized workspace administration.' });
+    } finally {
+      if (previousSalesEmail === undefined) delete process.env.SALES_EMAIL;
+      else process.env.SALES_EMAIL = previousSalesEmail;
+    }
+    expect(enquiry.status).toBe(503);
+    expect(enquiry.body.code).toBe('SALES_CONTACT_NOT_CONFIGURED');
   });
 
   it('does not expose an invitation URL when production email delivery is unavailable', async () => {
@@ -335,6 +365,42 @@ describe('TeamFlow SaaS workflows', () => {
     expect(await billingService.processStripeEvent(event)).toEqual({ duplicate: false });
     expect(await billingService.processStripeEvent(event)).toEqual({ duplicate: true });
     expect(await StripeEvent.countDocuments({ eventId: event.id, status: 'PROCESSED' })).toBe(1);
+  });
+
+  it('stores paid and failed Stripe invoice events once per invoice and isolates billing history', async () => {
+    const admin = await register({ organizationName: 'Invoice History Workspace' });
+    const otherWorkspace = await register({ organizationName: 'Other Invoice Workspace' });
+    await Subscription.create({
+      organization: admin.organization._id,
+      plan: 'PRO',
+      status: 'active',
+      stripeCustomerId: 'cus_teamflow_invoice_test',
+      stripeSubscriptionId: 'sub_teamflow_invoice_test',
+      currentPeriodEnd: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    });
+    const created = Math.floor(Date.now() / 1000);
+    const paidEvent = {
+      id: 'evt_teamflow_invoice_paid',
+      type: 'invoice.paid',
+      data: { object: { id: 'in_teamflow_paid', customer: 'cus_teamflow_invoice_test', subscription: 'sub_teamflow_invoice_test', number: 'TF-100', currency: 'usd', amount_paid: 4900, amount_due: 4900, created } },
+    };
+    const failedEvent = {
+      id: 'evt_teamflow_invoice_failed',
+      type: 'invoice.payment_failed',
+      data: { object: { id: 'in_teamflow_failed', customer: 'cus_teamflow_invoice_test', subscription: 'sub_teamflow_invoice_test', number: 'TF-101', currency: 'usd', amount_paid: 0, amount_due: 4900, created } },
+    };
+
+    await expect(billingService.processStripeEvent(paidEvent)).resolves.toEqual({ duplicate: false });
+    await expect(billingService.processStripeEvent(paidEvent)).resolves.toEqual({ duplicate: true });
+    await expect(billingService.processStripeEvent(failedEvent)).resolves.toEqual({ duplicate: false });
+    expect(await BillingPayment.countDocuments({ organization: admin.organization._id })).toBe(2);
+    expect(await BillingPayment.findOne({ stripeInvoiceId: 'in_teamflow_failed' })).toMatchObject({ status: 'payment_failed', amountDue: 4900 });
+    expect(await Subscription.exists({ organization: admin.organization._id, status: 'past_due' })).toBeTruthy();
+
+    const billing = await request(app).get('/api/v1/billing').set(headers(admin.token, admin.organization._id));
+    const otherBilling = await request(app).get('/api/v1/billing').set(headers(otherWorkspace.token, otherWorkspace.organization._id));
+    expect(billing.body.data.invoices).toHaveLength(2);
+    expect(otherBilling.body.data.invoices).toHaveLength(0);
   });
 
   it('authenticates socket connections, limits them to active workspaces, and delivers user notifications', async () => {
