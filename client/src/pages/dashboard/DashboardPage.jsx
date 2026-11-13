@@ -1,0 +1,27 @@
+import { useEffect, useState } from 'react';
+import { ArrowRight, CalendarDays, CheckCircle2, CircleAlert, CircleCheck, FolderKanban, ListTodo } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import PageHeader from '../../components/common/PageHeader.jsx';
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/PageStates.jsx';
+import { api } from '../../services/api.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { errorMessage, formatDate, initials, unwrap } from '../../utils/format.js';
+
+const statCards = [
+  { key: 'totalProjects', label: 'Total projects', icon: FolderKanban, color: 'violet' },
+  { key: 'totalTasks', label: 'Total tasks', icon: ListTodo, color: 'blue' },
+  { key: 'completedTasks', label: 'Completed', icon: CircleCheck, color: 'green' },
+  { key: 'overdueTasks', label: 'Overdue', icon: CircleAlert, color: 'orange' },
+];
+
+export default function DashboardPage() {
+  const { user, activeOrganization } = useAuth(); const [data, setData] = useState(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  useEffect(() => { let active = true; setLoading(true); api.get('/analytics/overview').then((response) => { if (active) setData(unwrap(response)); }).catch((requestError) => { if (active) setError(errorMessage(requestError)); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [activeOrganization?._id]);
+  const stats = data?.stats || {};
+  return <div className="page-stack"><PageHeader eyebrow={activeOrganization?.name || 'WORKSPACE OVERVIEW'} title={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, ${user?.name?.split(' ')[0] || 'there'}.`} description="Here’s what your team is moving forward." actions={<Link className="button button-primary" to="/projects">View projects <ArrowRight size={16} /></Link>} />
+    {loading ? <div className="stats-grid">{statCards.map((item) => <div key={item.key} className="stat-card skeleton-card"><span /><span /><span /></div>)}</div> : error ? <ErrorState message={error} /> : <div className="stats-grid">{statCards.map(({ key, label, icon: Icon, color }) => <article className="stat-card" key={key}><div className={`stat-icon stat-${color}`}><Icon size={18} /></div><span className="stat-label">{label}</span><strong>{stats[key] ?? 0}</strong><small>{key === 'completedTasks' ? `${stats.completionRate ?? 0}% completion rate` : label === 'Overdue' ? 'Needs attention' : 'Across your workspace'}</small></article>)}</div>}
+    {error && !loading ? null : <div className="dashboard-grid"><section className="panel project-panel"><div className="panel-heading"><div><h2>Recent projects</h2><p>Keep your current work close.</p></div><Link to="/projects">All projects <ArrowRight size={14} /></Link></div>{loading ? <LoadingState label="Loading projects…" /> : (data?.recentProjects || []).length ? <div className="recent-project-list">{data.recentProjects.map((project) => <Link className="recent-project" to={`/projects/${project._id}`} key={project._id}><span className="project-icon"><FolderKanban size={18} /></span><span className="project-line"><strong>{project.name}</strong><small>{project.taskCount ?? 0} tasks · {project.status?.toLowerCase().replace('_', ' ') || 'active'}</small></span><span className="mini-progress"><i style={{ width: `${project.progress ?? 0}%` }} /></span><b>{project.progress ?? 0}%</b><ArrowRight size={15} /></Link>)}</div> : <EmptyState title="Your first project starts here" description="Create a project to give your team a shared place to move work forward." action={<Link className="button button-secondary button-small" to="/projects">Browse projects</Link>} />}</section>
+      <section className="panel deadline-panel"><div className="panel-heading"><div><h2>Upcoming deadlines</h2><p>The next things on your calendar.</p></div><CalendarDays size={18} className="muted-icon" /></div>{loading ? <LoadingState label="Loading deadlines…" /> : (data?.upcomingDeadlines || []).length ? <div className="deadline-list">{data.upcomingDeadlines.map((task) => <div className="deadline-item" key={task._id}><span className="deadline-line" /><div><strong>{task.title}</strong><small>{task.project?.name || 'Project task'}</small></div><time>{formatDate(task.dueDate, { month: 'short', day: 'numeric' })}</time></div>)}</div> : <div className="simple-empty"><CheckCircle2 size={21} /><p>No upcoming deadlines. You’re all caught up.</p></div>}</section></div>}
+    <section className="panel activity-panel"><div className="panel-heading"><div><h2>Recent activity</h2><p>Updates across your workspace.</p></div><Link to="/notifications">Notifications <ArrowRight size={14} /></Link></div>{loading ? <LoadingState label="Loading activity…" /> : (data?.recentActivity || []).length ? <div className="activity-list">{data.recentActivity.map((activity) => <div className="activity-item" key={activity._id}><span className="avatar activity-avatar">{initials(activity.actor?.name)}</span><p><strong>{activity.actor?.name || 'A teammate'}</strong> {activity.message || activity.action?.toLowerCase().replaceAll('_', ' ')} <b>{activity.target?.title || activity.target?.name || ''}</b><small>{formatDate(activity.createdAt, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</small></p></div>)}</div> : <div className="simple-empty"><CircleCheck size={21} /><p>Activity will show up here as your team works.</p></div>}</section>
+  </div>;
+}

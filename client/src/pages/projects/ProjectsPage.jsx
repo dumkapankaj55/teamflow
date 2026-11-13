@@ -1,0 +1,31 @@
+import { useEffect, useState } from 'react';
+import { ArrowDownUp, ArrowRight, FolderKanban, Plus, Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import PageHeader from '../../components/common/PageHeader.jsx';
+import Button from '../../components/common/Button.jsx';
+import Modal from '../../components/common/Modal.jsx';
+import { EmptyState, ErrorState, LoadingState } from '../../components/common/PageStates.jsx';
+import { api } from '../../services/api.js';
+import { useToast } from '../../context/ToastContext.jsx';
+import { errorMessage, formatDate, unwrap } from '../../utils/format.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+
+function ProjectForm({ onClose, onCreated }) {
+  const toast = useToast();
+  const [form, setForm] = useState({ name: '', description: '', dueDate: '' }); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  const onSubmit = async (event) => { event.preventDefault(); setBusy(true); setError(''); try { const response = await api.post('/projects', form); toast('Project created'); onCreated(unwrap(response, 'project')); } catch (requestError) { setError(errorMessage(requestError)); } finally { setBusy(false); } };
+  return <Modal title="Create a project" onClose={onClose}><form className="form-stack" onSubmit={onSubmit}><label className="field-label">Project name<input autoFocus value={form.name} maxLength="100" onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Website redesign" required /></label><label className="field-label">Description<textarea rows="3" maxLength="2000" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="What does success look like?" /></label><label className="field-label">Due date<input type="date" value={form.dueDate} onChange={(event) => setForm({ ...form, dueDate: event.target.value })} /></label>{error && <p role="alert" className="form-error">{error}</p>}<div className="modal-actions"><Button variant="ghost" onClick={onClose}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? 'Creating…' : 'Create project'}</Button></div></form></Modal>;
+}
+
+export default function ProjectsPage() {
+  const { membership } = useAuth(); const canCreate = ['ADMIN', 'MANAGER'].includes(membership?.role);
+  const [projects, setProjects] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [search, setSearch] = useState(''); const [status, setStatus] = useState(''); const [sort, setSort] = useState('updatedAt'); const [createOpen, setCreateOpen] = useState(false);
+  const load = async () => { setLoading(true); setError(''); try { const response = await api.get('/projects', { params: { search: search || undefined, status: status || undefined, sort } }); setProjects(unwrap(response, 'projects') || []); } catch (requestError) { setError(errorMessage(requestError)); } finally { setLoading(false); } };
+  useEffect(() => { const timer = setTimeout(load, 180); return () => clearTimeout(timer); }, [search, status, sort]);
+  const created = (project) => { setCreateOpen(false); setProjects((previous) => [project, ...previous]); };
+  return <div className="page-stack"><PageHeader eyebrow="YOUR WORK, ORGANIZED" title="Projects" description="Plan work, share progress, and keep every project moving." actions={canCreate && <Button onClick={() => setCreateOpen(true)}><Plus size={16} /> New project</Button>} />
+    <div className="toolbar"><label className="search-field"><Search size={16} /><input aria-label="Search projects" placeholder="Search projects…" value={search} onChange={(event) => setSearch(event.target.value)} /></label><label className="select-field"><span>Status</span><select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All projects</option><option value="ACTIVE">Active</option><option value="ON_HOLD">On hold</option><option value="COMPLETED">Completed</option><option value="ARCHIVED">Archived</option></select></label><label className="select-field select-sort"><ArrowDownUp size={15} /><select aria-label="Sort projects" value={sort} onChange={(event) => setSort(event.target.value)}><option value="updatedAt">Recently updated</option><option value="name">Name</option><option value="dueDate">Due date</option><option value="createdAt">Date created</option></select></label></div>
+    {loading ? <LoadingState label="Loading projects…" /> : error ? <ErrorState message={error} /> : projects.length ? <div className="project-grid">{projects.map((project, index) => <article className="project-card" key={project._id}><div className="project-card-top"><span className={`project-icon project-color-${index % 4}`}><FolderKanban size={19} /></span><span className={`status-pill status-${(project.status || 'active').toLowerCase().replace('_', '-')}`}>{project.status?.toLowerCase().replace('_', ' ') || 'active'}</span></div><h2>{project.name}</h2><p>{project.description || 'No description added yet.'}</p><div className="project-card-meta"><span>{project.taskCount ?? 0} tasks</span><span>Due {formatDate(project.dueDate, { month: 'short', day: 'numeric' })}</span></div><div className="progress-track"><span style={{ width: `${project.progress ?? 0}%` }} /></div><div className="project-card-bottom"><span>{project.progress ?? 0}% complete</span><Link to={`/projects/${project._id}`} aria-label={`Open ${project.name}`}><ArrowRight size={16} /></Link></div></article>)}</div> : <div className="panel"><EmptyState title={search || status ? 'No projects match' : 'No projects yet'} description={search || status ? 'Try adjusting your search or filter.' : canCreate ? 'Start with a clear goal, then bring in the tasks and teammates that will get it done.' : 'Projects shared with you will appear here. Ask a workspace manager if you need access.'} action={search || status ? <Button variant="secondary" onClick={() => { setSearch(''); setStatus(''); }}>Clear filters</Button> : canCreate ? <Button onClick={() => setCreateOpen(true)}>Create project</Button> : undefined} /></div>}
+    {createOpen && <ProjectForm onClose={() => setCreateOpen(false)} onCreated={created} />}
+  </div>;
+}
