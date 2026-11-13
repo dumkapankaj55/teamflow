@@ -62,4 +62,19 @@ describe('API security baseline', () => {
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
     findOne.mockRestore();
   });
+
+  it('rejects membership in an inactive organization', async () => {
+    const organizationId = '665f2a9820bfcf3e5a129022';
+    const membership = { organization: { _id: organizationId, isActive: false } };
+    const populate = jest.fn().mockResolvedValue(membership);
+    const findOne = jest.spyOn(Membership, 'findOne').mockReturnValue({ populate });
+    const req = { params: { id: organizationId }, user: { _id: '665f2a9820bfcf3e5a129011' }, get: () => undefined };
+    const next = jest.fn();
+
+    await requireMembership(req, {}, next);
+
+    expect(populate).toHaveBeenCalledWith('organization', 'name slug settings isActive');
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403, code: 'ORGANIZATION_ACCESS_DENIED' }));
+    findOne.mockRestore();
+  });
 });

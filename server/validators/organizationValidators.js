@@ -12,4 +12,13 @@ module.exports = {
   invite: z.object({ email, role: role.default('MEMBER') }).strict(),
   changeRole: z.object({ role }).strict(),
   acceptInviteParams: z.object({ token: z.string().min(32).max(200) }),
+  auditQuery: z.object({
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(25),
+    action: z.string().trim().min(1).max(80).optional(),
+    targetType: z.enum(['ORGANIZATION', 'PROJECT', 'TASK', 'COMMENT', 'MEMBERSHIP']).optional(),
+    actor: objectId.optional(),
+    from: z.coerce.date().optional(),
+    to: z.coerce.date().optional(),
+  }).refine((value) => !value.from || !value.to || value.from <= value.to, { message: 'Start date must be before end date.' }),
 };

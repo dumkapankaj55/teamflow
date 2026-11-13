@@ -13,6 +13,8 @@ module.exports = {
   }).strict().refine((value) => value.invitationToken || value.organizationName, 'Workspace name is required unless you are accepting an invitation.'),
   login: z.object({ email, password: z.string().min(1).max(72) }).strict(),
   forgotPassword: z.object({ email }).strict(),
+  verifyEmail: z.object({ token: z.string().min(32).max(200) }).strict(),
+  resendVerification: z.object({ email }).strict(),
   resetPassword: z.object({
     token: z.string().min(32).max(200),
     otp: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code from your email.'),

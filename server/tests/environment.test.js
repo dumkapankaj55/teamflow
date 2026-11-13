@@ -2,7 +2,7 @@ const validateEnvironment = require('../config/validateEnvironment');
 
 describe('production environment validation', () => {
   const keys = [
-    'NODE_ENV', 'MONGODB_URI', 'ACCESS_TOKEN_SECRET', 'CORS_ORIGINS', 'CLIENT_URL', 'PASSWORD_RESET_URL',
+    'NODE_ENV', 'MONGODB_URI', 'ACCESS_TOKEN_SECRET', 'CORS_ORIGINS', 'CLIENT_URL', 'PASSWORD_RESET_URL', 'REQUIRE_EMAIL_VERIFICATION',
     'SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD', 'COOKIE_SECURE', 'COOKIE_SAME_SITE', 'TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY',
   ];
   const original = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
@@ -12,7 +12,7 @@ describe('production environment validation', () => {
       NODE_ENV: 'production', MONGODB_URI: 'mongodb://example.test/teamflow', ACCESS_TOKEN_SECRET: 'a'.repeat(48),
       CORS_ORIGINS: 'https://teamflow.example', CLIENT_URL: 'https://teamflow.example', PASSWORD_RESET_URL: 'https://teamflow.example/reset-password',
       SMTP_HOST: 'smtp.example.test', SMTP_USER: 'teamflow', SMTP_PASSWORD: 'smtp-secret', COOKIE_SECURE: 'true', COOKIE_SAME_SITE: 'none',
-      TURNSTILE_SITE_KEY: 'real-site-key', TURNSTILE_SECRET_KEY: 'real-secret-key',
+      TURNSTILE_SITE_KEY: 'real-site-key', TURNSTILE_SECRET_KEY: 'real-secret-key', REQUIRE_EMAIL_VERIFICATION: 'true',
     });
   });
 

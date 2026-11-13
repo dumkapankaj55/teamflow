@@ -12,5 +12,6 @@ const invitationSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 invitationSchema.index({ organization: 1, email: 1, status: 1 }, { unique: true, partialFilterExpression: { status: 'PENDING' } });
-invitationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+invitationSchema.index({ expiresAt: 1 });
+invitationSchema.index({ organization: 1, status: 1, expiresAt: 1 });
 module.exports = mongoose.models.Invitation || mongoose.model('Invitation', invitationSchema);

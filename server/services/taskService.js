@@ -5,6 +5,7 @@ const Membership = require('../models/Membership');
 const Comment = require('../models/Comment');
 const ActivityLog = require('../models/ActivityLog');
 const Notification = require('../models/Notification');
+const User = require('../models/User');
 const { recordActivity } = require('./activityService');
 const { notify } = require('./notificationService');
 
@@ -25,12 +26,25 @@ async function assertTaskReadable(task, userId, role) {
 
 async function listTasks({ organizationId, userId, role, query }) {
   const filter = { organization: organizationId };
-  if (role === 'MEMBER' || query.mine) filter.assignee = userId;
+  if (query.mine) {
+    filter.assignee = userId;
+  } else if (role === 'MEMBER') {
+    const memberProjects = await Project.distinct('_id', { organization: organizationId, members: userId });
+    filter.$or = [{ assignee: userId }, { project: { $in: memberProjects } }];
+  }
   if (query.projectId) filter.project = query.projectId;
   if (query.status) filter.status = query.status;
   if (query.priority) filter.priority = query.priority;
   if (query.assignedTo && role !== 'MEMBER') filter.assignee = query.assignedTo;
-  if (query.search) filter.$or = [{ title: { $regex: escapeRegex(query.search), $options: 'i' } }, { description: { $regex: escapeRegex(query.search), $options: 'i' } }];
+  if (query.search) {
+    const search = { $or: [{ title: { $regex: escapeRegex(query.search), $options: 'i' } }, { description: { $regex: escapeRegex(query.search), $options: 'i' } }] };
+    if (filter.$or) {
+      filter.$and = [{ $or: filter.$or }, search];
+      delete filter.$or;
+    } else {
+      filter.$or = search.$or;
+    }
+  }
   const skip = (query.page - 1) * query.limit;
   const [tasks, total] = await Promise.all([
     Task.find(filter).sort({ status: 1, sortOrder: 1, dueDate: 1, updatedAt: -1 }).skip(skip).limit(query.limit).populate(populateTask),
@@ -117,7 +131,6 @@ async function deleteTask({ organizationId, taskId, userId }) {
   await Promise.all([
     Comment.deleteMany({ organization: organizationId, task: taskId }),
     Notification.deleteMany({ organization: organizationId, task: taskId }),
-    ActivityLog.deleteMany({ organization: organizationId, task: taskId }),
   ]);
   await recordActivity({ organization: organizationId, actor: userId, action: 'TASK_DELETED', message: `deleted task “${task.title}”`, targetType: 'TASK', targetId: taskId, project: task.project });
   return { deleted: true };
@@ -154,6 +167,29 @@ async function addComment({ organizationId, taskId, userId, role, body }) {
   const reporterId = task.reporter?._id || task.reporter;
   const recipients = new Set([String(assigneeId || ''), String(reporterId || ''), ...(project?.members || []).map(String)]); recipients.delete(''); recipients.delete(String(userId));
   await Promise.all([...recipients].map((recipient) => notify({ organization: organizationId, user: recipient, type: 'COMMENT_ADDED', title: 'New comment on a task', message: `${task.title}: ${body.slice(0, 160)}`, project: task.project, task: task._id })));
+  const mentionedEmails = [...new Set([...body.matchAll(/@([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi)].map((match) => match[1].toLowerCase()))];
+  if (mentionedEmails.length) {
+    const mentionedUsers = await User.find({ email: { $in: mentionedEmails }, isActive: true }).select('_id email');
+    const memberships = await Membership.find({
+      organization: organizationId,
+      status: 'ACTIVE',
+      user: { $in: mentionedUsers.map((user) => user._id) },
+    }).select('user role');
+    const canRead = new Set([...(project?.members || []).map(String), String(assigneeId || ''), String(reporterId || '')]);
+    const eligible = memberships.filter((membership) =>
+      ['ADMIN', 'MANAGER'].includes(membership.role) || canRead.has(String(membership.user))
+    ).map((membership) => String(membership.user)).filter((id) => id !== String(userId));
+    const actor = await User.findById(userId).select('name');
+    await Promise.all([...new Set(eligible)].map((recipient) => notify({
+      organization: organizationId,
+      user: recipient,
+      type: 'MENTIONED',
+      title: `${actor?.name || 'A teammate'} mentioned you`,
+      message: `You were mentioned on ${task.title}.`,
+      project: task.project,
+      task: task._id,
+    })));
+  }
   return comment.populate('author', 'name email');
 }
 

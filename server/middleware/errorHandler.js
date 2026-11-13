@@ -1,6 +1,7 @@
 const AppError = require('../utils/AppError');
+const { logger } = require('../config/logger');
 
-module.exports = (err, _req, res, _next) => {
+module.exports = (err, req, res, _next) => {
   let error = err;
   if (err?.name === 'ValidationError' || err?.name === 'CastError' || err?.code === 11000) {
     const duplicate = err.code === 11000;
@@ -12,11 +13,15 @@ module.exports = (err, _req, res, _next) => {
       : 'An unexpected server error occurred.';
     error = new AppError(message, 500, 'INTERNAL_ERROR');
   }
-  if (error.statusCode >= 500) console.error(err);
+  if (error.statusCode >= 500) {
+    req.log?.error({ errorName: err?.name, errorCode: err?.code, requestId: req.id }, 'API request failed');
+    if (!req.log) logger.error({ errorName: err?.name, errorCode: err?.code, requestId: req.id }, 'API request failed');
+  }
   return res.status(error.statusCode).json({
     success: false,
     message: error.message,
     code: error.code,
     ...(error.details ? { errors: error.details } : {}),
+    ...(req.id ? { requestId: req.id } : {}),
   });
 };

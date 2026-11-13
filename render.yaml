@@ -14,6 +14,8 @@ services:
         generateValue: true
       - key: ACCESS_TOKEN_TTL
         value: 15m
+      - key: REQUIRE_EMAIL_VERIFICATION
+        value: "true"
       - key: REFRESH_TOKEN_TTL_DAYS
         value: 30
       - key: COOKIE_NAME

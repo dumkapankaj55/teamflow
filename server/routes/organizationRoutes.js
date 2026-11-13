@@ -4,11 +4,15 @@ const authenticate = require('../middleware/authenticate');
 const requireMembership = require('../middleware/requireMembership');
 const authorizeRoles = require('../middleware/authorizeRoles');
 const validate = require('../middleware/validate');
+const auditService = require('../services/auditService');
+const { success } = require('../utils/response');
+const asyncHandler = require('../utils/asyncHandler');
 const validators = require('../validators/organizationValidators');
 
 const router = express.Router();
 router.post('/', authenticate, validate({ body: validators.create }), controller.create);
 router.get('/', authenticate, controller.list);
+router.get('/:id/audit-logs', authenticate, requireMembership, authorizeRoles('ADMIN', 'MANAGER'), validate({ params: validators.id, query: validators.auditQuery }), asyncHandler(async (req, res) => success(res, await auditService.listAuditLogs({ organizationId: req.organizationId, ...req.validated.query }))));
 router.get('/:id', authenticate, requireMembership, validate({ params: validators.id }), controller.get);
 router.patch('/:id', authenticate, requireMembership, authorizeRoles('ADMIN'), validate({ params: validators.id, body: validators.update }), controller.update);
 router.get('/:id/members', authenticate, requireMembership, validate({ params: validators.id }), controller.members);

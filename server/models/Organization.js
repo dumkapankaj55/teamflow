@@ -5,6 +5,10 @@ const organizationSchema = new mongoose.Schema({
   slug: { type: String, required: true, lowercase: true, trim: true, unique: true, match: /^[a-z0-9]+(?:-[a-z0-9]+)*$/ },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   settings: { timezone: { type: String, default: 'UTC' }, weekStartsOn: { type: Number, min: 0, max: 6, default: 1 } },
+  usageCounters: {
+    memberSeats: { type: Number, min: 0 },
+    projects: { type: Number, min: 0 },
+  },
   isActive: { type: Boolean, default: true, index: true },
 }, { timestamps: true });
 

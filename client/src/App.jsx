@@ -7,6 +7,7 @@ import RoleProtectedRoute from './routes/RoleProtectedRoute.jsx';
 import LandingPage from './pages/LandingPage.jsx';
 import LoginPage from './pages/auth/LoginPage.jsx';
 import RegisterPage from './pages/auth/RegisterPage.jsx';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage.jsx';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx';
 import AcceptInvitationPage from './pages/auth/AcceptInvitationPage.jsx';
@@ -19,6 +20,8 @@ import NotificationsPage from './pages/dashboard/NotificationsPage.jsx';
 import ProfilePage from './pages/settings/ProfilePage.jsx';
 import SettingsPage from './pages/settings/SettingsPage.jsx';
 import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage.jsx';
+import AuditHistoryPage from './pages/dashboard/AuditHistoryPage.jsx';
+import BillingPage from './pages/settings/BillingPage.jsx';
 
 const BoardPage = lazy(() => import('./pages/tasks/BoardPage.jsx'));
 const AnalyticsPage = lazy(() => import('./pages/dashboard/AnalyticsPage.jsx'));
@@ -39,6 +42,7 @@ export default function App() {
       <Route path="/" element={<HomeRoute />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
@@ -52,7 +56,9 @@ export default function App() {
           <Route path="/team" element={<TeamPage />} />
           <Route element={<RoleProtectedRoute roles={['ADMIN', 'MANAGER']} />}>
             <Route path="/analytics" element={<Suspense fallback={<div className="full-loading" role="status">Loading analytics…</div>}><AnalyticsPage /></Suspense>} />
+            <Route path="/audit" element={<AuditHistoryPage />} />
           </Route>
+          <Route element={<RoleProtectedRoute roles={['ADMIN']} />}><Route path="/billing" element={<BillingPage />} /></Route>
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />

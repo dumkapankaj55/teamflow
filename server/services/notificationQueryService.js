@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const AppError = require('../utils/AppError');
 const Notification = require('../models/Notification');
 

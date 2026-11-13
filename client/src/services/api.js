@@ -10,8 +10,14 @@ let accessToken = null;
 let refreshRequest = null;
 
 export function setAccessToken(token) {
-  accessToken = token || null;
+  const nextToken = token || null;
+  if (nextToken !== accessToken) {
+    accessToken = nextToken;
+    window.dispatchEvent(new Event('teamflow:access-token-updated'));
+  }
 }
+
+export function getAccessToken() { return accessToken; }
 
 api.interceptors.request.use((config) => {
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bell, Check, CheckCheck, MessageSquare, UserPlus, CircleCheck, CalendarClock } from 'lucide-react';
+import { Bell, Check, CheckCheck, MessageSquare, UserPlus, CircleCheck, CalendarClock, AtSign } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import PageHeader from '../../components/common/PageHeader.jsx';
 import Button from '../../components/common/Button.jsx';
@@ -7,12 +7,21 @@ import { EmptyState, ErrorState, LoadingState } from '../../components/common/Pa
 import { api } from '../../services/api.js';
 import { errorMessage, formatDate, unwrap } from '../../utils/format.js';
 
-const icons = { TASK_ASSIGNED: UserPlus, DEADLINE_CHANGED: CalendarClock, COMMENT_ADDED: MessageSquare, INVITATION_RECEIVED: Bell, TASK_COMPLETED: CircleCheck };
+const icons = { TASK_ASSIGNED: UserPlus, DEADLINE_CHANGED: CalendarClock, COMMENT_ADDED: MessageSquare, INVITATION_RECEIVED: Bell, TASK_COMPLETED: CircleCheck, MENTIONED: AtSign };
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   const load = async () => { setLoading(true); try { const response = await api.get('/notifications', { params: { limit: 100 } }); setNotifications(unwrap(response, 'notifications') || []); setError(''); } catch (requestError) { setError(errorMessage(requestError)); } finally { setLoading(false); } };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const onNotification = (event) => {
+      const notification = event.detail;
+      if (!notification?._id) return;
+      setNotifications((items) => items.some((item) => item._id === notification._id) ? items : [notification, ...items].slice(0, 100));
+    };
+    window.addEventListener('teamflow:notification', onNotification);
+    return () => window.removeEventListener('teamflow:notification', onNotification);
+  }, []);
   const markRead = async (notification) => { if (notification.readAt || notification.isRead) return; setNotifications((items) => items.map((item) => item._id === notification._id ? { ...item, isRead: true } : item)); try { await api.patch(`/notifications/${notification._id}/read`); } catch (requestError) { setError(errorMessage(requestError)); await load(); } };
   const markAllRead = async () => { const previous = notifications; setNotifications((items) => items.map((item) => ({ ...item, isRead: true, readAt: item.readAt || new Date().toISOString() }))); try { await api.patch('/notifications/read-all'); } catch (requestError) { setNotifications(previous); setError(errorMessage(requestError)); } };
   const unread = notifications.filter((item) => !(item.readAt || item.isRead)).length;

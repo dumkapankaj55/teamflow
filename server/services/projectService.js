@@ -5,8 +5,8 @@ const Task = require('../models/Task');
 const Membership = require('../models/Membership');
 const Comment = require('../models/Comment');
 const Notification = require('../models/Notification');
-const ActivityLog = require('../models/ActivityLog');
 const { recordActivity } = require('./activityService');
+const billingService = require('./billingService');
 
 async function validateMembers(organizationId, members = []) {
   if (!members.length) return [];
@@ -70,7 +70,14 @@ async function getProject({ organizationId, projectId, userId, role }) {
 async function createProject({ organizationId, userId, input }) {
   const members = await validateMembers(organizationId, [...new Set([userId, ...(input.members || [])])]);
   if (input.startDate && input.dueDate && input.dueDate < input.startDate) throw new AppError('Due date must be on or after the start date.', 400, 'INVALID_DATE_RANGE');
-  const project = await Project.create({ ...input, members, organization: organizationId, createdBy: userId, updatedBy: userId });
+  await billingService.reserveProjectSlot(organizationId);
+  let project;
+  try {
+    project = await Project.create({ ...input, members, organization: organizationId, createdBy: userId, updatedBy: userId });
+  } catch (error) {
+    await billingService.releaseProjectSlot(organizationId);
+    throw error;
+  }
   await recordActivity({ organization: organizationId, actor: userId, action: 'PROJECT_CREATED', message: `created project “${project.name}”`, targetType: 'PROJECT', targetId: project._id, project: project._id });
   return getProject({ organizationId, projectId: project._id, userId, role: 'ADMIN' });
 }
@@ -102,10 +109,10 @@ async function deleteProject({ organizationId, projectId, userId }) {
   await Promise.all([
     Comment.deleteMany({ organization: organizationId, task: { $in: taskIds } }),
     Notification.deleteMany({ organization: organizationId, $or: [{ project: projectId }, { task: { $in: taskIds } }] }),
-    ActivityLog.deleteMany({ organization: organizationId, $or: [{ project: projectId }, { task: { $in: taskIds } }] }),
     Task.deleteMany({ organization: organizationId, project: projectId }),
     Project.deleteOne({ _id: projectId, organization: organizationId }),
   ]);
+  await billingService.releaseProjectSlot(organizationId);
   await recordActivity({ organization: organizationId, actor: userId, action: 'PROJECT_DELETED', message: `deleted project “${project.name}”`, targetType: 'PROJECT', targetId: projectId });
   return { deleted: true };
 }

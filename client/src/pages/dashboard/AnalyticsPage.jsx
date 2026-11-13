@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Activity, Users, CheckCircle2, FolderKanban } from 'lucide-react';
 import PageHeader from '../../components/common/PageHeader.jsx';
@@ -9,8 +11,79 @@ import { errorMessage, initials, unwrap } from '../../utils/format.js';
 const chartColors = ['#635bff', '#31b978', '#f4a64f', '#a6b4c4'];
 
 export default function AnalyticsPage() {
-  const [data, setData] = useState(null); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
-  useEffect(() => { let active = true; setLoading(true); Promise.all([api.get('/analytics/tasks'), api.get('/analytics/projects'), api.get('/analytics/team')]).then(([tasks, projects, team]) => { if (active) setData({ ...unwrap(tasks), ...unwrap(projects), ...unwrap(team) }); }).catch((requestError) => { if (active) setError(errorMessage(requestError)); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, []);
-  const statusData = data?.tasksByStatus || []; const priorityData = data?.tasksByPriority || []; const trendData = data?.completionTrend || []; const workload = data?.teamWorkload || []; const projectProgress = data?.projectProgress || [];
-  return <div className="page-stack"><PageHeader eyebrow="A CLEARER VIEW" title="Analytics" description="See how work is flowing across your workspace." actions={<span className="report-period"><Activity size={15} /> Last 30 days</span>} />{error && <ErrorState message={error} />}{loading ? <div className="analytics-grid"><LoadingState label="Loading analytics…" /></div> : !statusData.length && !trendData.length ? <div className="panel"><EmptyState title="Analytics will grow with your team" description="Task and project activity will appear here once your workspace has work in progress." /></div> : <><div className="analytics-grid"><section className="panel chart-panel chart-wide"><div className="panel-heading"><div><h2>Task completion</h2><p>Tasks completed over time</p></div><CheckCircle2 size={18} className="muted-icon" /></div><div className="chart-container"><ResponsiveContainer width="100%" height="100%"><BarChart data={trendData} margin={{ top: 12, right: 10, left: -18, bottom: 0 }}><CartesianGrid vertical={false} stroke="#edf0f5" /><XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} /><YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} allowDecimals={false} /><Tooltip /><Bar dataKey="completed" fill="#635bff" radius={[5, 5, 0, 0]} barSize={24} /></BarChart></ResponsiveContainer></div></section><section className="panel chart-panel"><div className="panel-heading"><div><h2>Task status</h2><p>Current distribution</p></div><FolderKanban size={18} className="muted-icon" /></div><div className="chart-container chart-donut"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={statusData} dataKey="count" nameKey="status" innerRadius={58} outerRadius={82} paddingAngle={3}>{statusData.map((item, index) => <Cell key={item.status} fill={chartColors[index % chartColors.length]} />)}</Pie><Tooltip /><Legend verticalAlign="bottom" height={32} iconType="circle" formatter={(value) => value.toLowerCase().replace('_', ' ')} /></PieChart></ResponsiveContainer></div></section><section className="panel chart-panel"><div className="panel-heading"><div><h2>Project progress</h2><p>Progress by project</p></div></div>{projectProgress.length ? <div className="progress-list">{projectProgress.map((project) => <div className="progress-list-item" key={project._id}><div><strong>{project.name}</strong><span>{project.progress}%</span></div><div className="progress-track"><span style={{ width: `${project.progress}%` }} /></div></div>)}</div> : <p className="muted-copy">No project progress to report yet.</p>}</section><section className="panel chart-panel"><div className="panel-heading"><div><h2>Team workload</h2><p>Open tasks by owner</p></div><Users size={18} className="muted-icon" /></div>{workload.length ? <div className="workload-list">{workload.map((person) => <div className="workload-row" key={person.userId}><span className="avatar avatar-small">{initials(person.name)}</span><div><strong>{person.name}</strong><div className="progress-track"><span style={{ width: `${Math.min(100, (person.openTasks / Math.max(...workload.map((entry) => entry.openTasks), 1)) * 100)}%` }} /></div></div><b>{person.openTasks}</b></div>)}</div> : <p className="muted-copy">Team workload appears as tasks are assigned.</p>}</section><section className="panel chart-panel"><div className="panel-heading"><div><h2>Task priority</h2><p>Open tasks by priority</p></div></div>{priorityData.length ? <div className="priority-summary">{priorityData.map((item) => <div key={item.priority}><span className={`priority-dot priority-dot-${item.priority.toLowerCase()}`} /><span>{item.priority.toLowerCase()}</span><strong>{item.count}</strong></div>)}</div> : <p className="muted-copy">No task priority data available.</p>}</section></div></>}</div>;
+  const { membership } = useAuth();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [featureLocked, setFeatureLocked] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      api.get('/analytics/tasks'),
+      api.get('/analytics/projects'),
+      api.get('/analytics/team'),
+    ]).then(([tasks, projects, team]) => {
+      if (active) setData({ ...unwrap(tasks), ...unwrap(projects), ...unwrap(team) });
+    }).catch((requestError) => {
+      if (active) {
+        const locked = requestError.response?.data?.code === 'PLAN_FEATURE_REQUIRED';
+        setFeatureLocked(locked);
+        setError(locked ? 'Advanced analytics are available on Pro and Enterprise plans.' : errorMessage(requestError));
+      }
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  const statusData = data?.tasksByStatus || [];
+  const priorityData = data?.tasksByPriority || [];
+  const trendData = data?.completionTrend || [];
+  const workload = data?.teamWorkload || [];
+  const projectProgress = data?.projectProgress || [];
+  const hasActivity = statusData.length || trendData.length;
+  const plansAction = featureLocked && (membership?.role === 'ADMIN'
+    ? <Link to="/billing" className="button button-primary button-small">View plans</Link>
+    : <span>Ask a workspace admin to review plan options.</span>);
+
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="A CLEARER VIEW"
+        title="Analytics"
+        description="See how work is flowing across your workspace."
+        actions={<span className="report-period"><Activity size={15} /> Last 30 days</span>}
+      />
+      {error && <ErrorState message={error} action={plansAction} />}
+      {loading ? <LoadingState label="Loading analytics…" /> : featureLocked ? null : !hasActivity ? (
+        <div className="panel">
+          <EmptyState title="Analytics will grow with your team" description="Task and project activity will appear here once your workspace has work in progress." />
+        </div>
+      ) : (
+        <div className="analytics-grid">
+          <section className="panel chart-panel chart-wide">
+            <div className="panel-heading"><div><h2>Task completion</h2><p>Tasks completed over time</p></div><CheckCircle2 size={18} className="muted-icon" /></div>
+            <div className="chart-container"><ResponsiveContainer width="100%" height="100%"><BarChart data={trendData} margin={{ top: 12, right: 10, left: -18, bottom: 0 }}><CartesianGrid vertical={false} stroke="#edf0f5" /><XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} /><YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} allowDecimals={false} /><Tooltip /><Bar dataKey="completed" fill="#635bff" radius={[5, 5, 0, 0]} barSize={24} /></BarChart></ResponsiveContainer></div>
+          </section>
+          <section className="panel chart-panel">
+            <div className="panel-heading"><div><h2>Task status</h2><p>Current distribution</p></div><FolderKanban size={18} className="muted-icon" /></div>
+            <div className="chart-container chart-donut"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={statusData} dataKey="count" nameKey="status" innerRadius={58} outerRadius={82} paddingAngle={3}>{statusData.map((item, index) => <Cell key={item.status} fill={chartColors[index % chartColors.length]} />)}</Pie><Tooltip /><Legend verticalAlign="bottom" height={32} iconType="circle" formatter={(value) => value.toLowerCase().replace('_', ' ')} /></PieChart></ResponsiveContainer></div>
+          </section>
+          <section className="panel chart-panel">
+            <div className="panel-heading"><div><h2>Project progress</h2><p>Progress by project</p></div></div>
+            {projectProgress.length ? <div className="progress-list">{projectProgress.map((project) => <div className="progress-list-item" key={project._id}><div><strong>{project.name}</strong><span>{project.progress}%</span></div><div className="progress-track"><span style={{ width: `${project.progress}%` }} /></div></div>)}</div> : <p className="muted-copy">No project progress to report yet.</p>}
+          </section>
+          <section className="panel chart-panel">
+            <div className="panel-heading"><div><h2>Team workload</h2><p>Open tasks by owner</p></div><Users size={18} className="muted-icon" /></div>
+            {workload.length ? <div className="workload-list">{workload.map((person) => <div className="workload-row" key={person.userId}><span className="avatar avatar-small">{initials(person.name)}</span><div><strong>{person.name}</strong><div className="progress-track"><span style={{ width: `${Math.min(100, (person.openTasks / Math.max(...workload.map((entry) => entry.openTasks), 1)) * 100)}%` }} /></div></div><b>{person.openTasks}</b></div>)}</div> : <p className="muted-copy">Team workload appears as tasks are assigned.</p>}
+          </section>
+          <section className="panel chart-panel">
+            <div className="panel-heading"><div><h2>Task priority</h2><p>Open tasks by priority</p></div></div>
+            {priorityData.length ? <div className="priority-summary">{priorityData.map((item) => <div key={item.priority}><span className={`priority-dot priority-dot-${item.priority.toLowerCase()}`} /><span>{item.priority.toLowerCase()}</span><strong>{item.count}</strong></div>)}</div> : <p className="muted-copy">No task priority data available.</p>}
+          </section>
+        </div>
+      )}
+    </div>
+  );
 }

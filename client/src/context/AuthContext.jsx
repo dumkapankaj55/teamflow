@@ -67,7 +67,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (credentials) => finishSignIn(await api.post('/auth/login', credentials));
-  const register = async (details) => finishSignIn(await api.post('/auth/register', details));
+  const register = async (details) => {
+    const response = await api.post('/auth/register', details);
+    if (response.data?.data?.verificationRequired) return response.data.data;
+    return finishSignIn(response);
+  };
   const logout = async () => {
     try { await api.post('/auth/logout'); } catch (_error) { /* Local sign-out still clears the in-memory session. */ } finally {
       setAccessToken(null);

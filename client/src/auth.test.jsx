@@ -1,11 +1,13 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { vi } from 'vitest';
+import App from './App.jsx';
 import LoginPage from './pages/auth/LoginPage.jsx';
 import RegisterPage from './pages/auth/RegisterPage.jsx';
 import ProjectsPage from './pages/projects/ProjectsPage.jsx';
 import ProtectedRoute from './routes/ProtectedRoute.jsx';
+import Sidebar from './components/layout/Sidebar.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import { api } from './services/api.js';
 
@@ -15,10 +17,22 @@ const mocks = vi.hoisted(() => ({
   authState: { user: null, loading: false, membership: { role: 'ADMIN' } },
 }));
 
-vi.mock('./context/AuthContext.jsx', () => ({ useAuth: () => ({ ...mocks.authState, login: mocks.login, register: mocks.register }) }));
+vi.mock('./context/AuthContext.jsx', () => ({ useAuth: () => ({
+  organizations: [],
+  activeOrganizationId: '',
+  setActiveOrganizationId: vi.fn(),
+  logout: vi.fn(),
+  ...mocks.authState,
+  login: mocks.login,
+  register: mocks.register,
+}) }));
 
 function renderInRouter(ui, initialEntry = '/') {
   return render(<ToastProvider><MemoryRouter initialEntries={[initialEntry]}>{ui}</MemoryRouter></ToastProvider>);
+}
+
+function CurrentPath() {
+  return <output>{useLocation().pathname}</output>;
 }
 
 describe('authentication forms', () => {
@@ -46,6 +60,19 @@ describe('authentication forms', () => {
     await waitFor(() => expect(mocks.register).toHaveBeenCalledWith(expect.objectContaining({ name: 'Jamie Lee', email: 'jamie@example.com', organizationName: 'Northstar Studio' })));
     expect(await screen.findByRole('alert')).toHaveTextContent('Email already used.');
   });
+
+  it('asks the new user to verify their email before signing in when required', async () => {
+    const user = userEvent.setup();
+    mocks.register.mockResolvedValueOnce({ verificationRequired: true });
+    renderInRouter(<RegisterPage />);
+    await user.type(screen.getByLabelText(/your name/i), 'Jamie Lee');
+    await user.type(screen.getByLabelText(/work email/i), 'jamie@example.com');
+    await user.type(screen.getByLabelText(/workspace name/i), 'Northstar Studio');
+    await user.type(screen.getByLabelText(/password/i), 'secure-password9!');
+    await user.click(screen.getByRole('button', { name: /create your workspace/i }));
+    expect(await screen.findByRole('heading', { name: /check your inbox/i })).toBeInTheDocument();
+    expect(screen.getByText(/we sent a verification link to jamie@example\.com/i)).toBeInTheDocument();
+  });
 });
 
 describe('protected routes and project actions', () => {
@@ -66,5 +93,32 @@ describe('protected routes and project actions', () => {
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: /create project/i }));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/projects', expect.objectContaining({ name: 'Website launch' })));
     api.get.mockRestore(); api.post.mockRestore();
+  });
+});
+
+describe('Free plan analytics navigation', () => {
+  beforeEach(() => {
+    mocks.authState = { user: { _id: 'free-admin' }, loading: false, membership: { role: 'ADMIN', plan: { id: 'FREE' } } };
+  });
+
+  it('opens the Analytics dashboard from the sidebar without visiting Billing', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, 'get').mockImplementation((path) => Promise.resolve({ data: { data: path === '/analytics/overview' ? { stats: {} } : {} } }));
+    renderInRouter(<><Sidebar /><CurrentPath /></>);
+    await user.click(screen.getByRole('link', { name: /analytics/i }));
+    expect(screen.getByText('/analytics')).toBeInTheDocument();
+    expect(screen.queryByText('/billing')).not.toBeInTheDocument();
+    api.get.mockRestore();
+  });
+
+  it('loads analytics through the protected application routes for a Free plan admin', async () => {
+    vi.spyOn(api, 'get').mockImplementation((path) => Promise.resolve({
+      data: { data: path === '/analytics/tasks' ? { tasksByStatus: [], tasksByPriority: [], completionTrend: [] } : path === '/analytics/projects' ? { projectProgress: [] } : { teamWorkload: [] } },
+    }));
+    renderInRouter(<App />, '/analytics');
+    expect(await screen.findByRole('heading', { name: 'Analytics' })).toBeInTheDocument();
+    expect(await screen.findByText('Analytics will grow with your team')).toBeInTheDocument();
+    expect(screen.queryByText(/view plans/i)).not.toBeInTheDocument();
+    api.get.mockRestore();
   });
 });

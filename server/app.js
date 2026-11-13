@@ -10,8 +10,15 @@ const projectRoutes = require('./routes/projectRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const billingRoutes = require('./routes/billingRoutes');
+const billingController = require('./controllers/billingController');
+const mongoose = require('mongoose');
 const notFound = require('./middleware/notFound');
 const errorHandler = require('./middleware/errorHandler');
+const swaggerUi = require('swagger-ui-express');
+const openApiSpec = require('./config/openApiSpec');
+const { requestIdMiddleware } = require('./config/logger');
+const { captureError } = require('./config/monitoring');
 
 const app = express();
 
@@ -41,6 +48,7 @@ function isPrivateDevelopmentOrigin(origin) {
 
 app.disable('x-powered-by');
 if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+app.use(requestIdMiddleware());
 app.use(helmet());
 app.use(cors({
   origin(origin, callback) {
@@ -49,6 +57,7 @@ app.use(cors({
   },
   credentials: true,
 }));
+app.post('/api/v1/billing/webhook', express.raw({ type: 'application/json', limit: '1mb' }), billingController.webhook);
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
@@ -66,6 +75,17 @@ app.get('/api/v1/health', (_req, res) => {
     data: { service: 'teamflow-api', status: 'ok', timestamp: new Date().toISOString() },
   });
 });
+app.get('/api/v1/health/ready', (_req, res) => {
+  const ready = mongoose.connection.readyState === 1;
+  return res.status(ready ? 200 : 503).json({ success: ready, data: { service: 'teamflow-api', status: ready ? 'ready' : 'not-ready', database: ready ? 'connected' : 'disconnected', timestamp: new Date().toISOString() } });
+});
+
+app.get('/api/openapi.json', (_req, res) => res.json(openApiSpec));
+app.use('/api/docs', (_req, res, next) => {
+  // Swagger UI needs inline bootstrap code. Keep Helmet's CSP on application routes.
+  res.removeHeader('Content-Security-Policy');
+  next();
+}, swaggerUi.serve, swaggerUi.setup(openApiSpec, { explorer: true }));
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/organizations', organizationRoutes);
@@ -74,7 +94,12 @@ app.use('/api/v1/projects', projectRoutes);
 app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/v1/billing', billingRoutes);
 app.use('/api/v1', notFound);
+app.use((error, req, _res, next) => {
+  captureError(error);
+  next(error);
+});
 app.use(errorHandler);
 
 module.exports = app;

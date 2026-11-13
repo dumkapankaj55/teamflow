@@ -5,7 +5,7 @@ const activityLogSchema = new mongoose.Schema({
   actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   action: { type: String, required: true, maxlength: 80 },
   message: { type: String, required: true, maxlength: 300 },
-  targetType: { type: String, enum: ['PROJECT', 'TASK', 'COMMENT', 'MEMBERSHIP'], required: true },
+  targetType: { type: String, enum: ['ORGANIZATION', 'PROJECT', 'TASK', 'COMMENT', 'MEMBERSHIP'], required: true },
   targetId: { type: mongoose.Schema.Types.ObjectId, required: true },
   project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
   task: { type: mongoose.Schema.Types.ObjectId, ref: 'Task' },

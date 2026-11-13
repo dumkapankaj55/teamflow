@@ -8,7 +8,7 @@ import { EmptyState, ErrorState, LoadingState } from '../../components/common/Pa
 import { api } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
-import { errorMessage, formatDate, initials, titleCase, unwrap } from '../../utils/format.js';
+import { errorMessage, formatDate, titleCase, unwrap } from '../../utils/format.js';
 
 function ProjectTaskForm({ projectId, onClose, onCreated }) {
   const { user, activeOrganization } = useAuth();
