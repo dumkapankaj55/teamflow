@@ -60,4 +60,15 @@ describe('Resend mailer service', () => {
         statusCode: 503,
       });
   });
+
+  it('returns a safe delivery error when the Resend request throws', async () => {
+    send.mockRejectedValue(new Error('private network detail containing re_test_secret'));
+
+    await expect(mailerService.sendEmail({ to: 'member@example.test', subject: 'Test', text: 'Test' }))
+      .rejects.toMatchObject({
+        message: 'Email delivery failed. Please try again later.',
+        code: 'EMAIL_DELIVERY_UNAVAILABLE',
+        statusCode: 503,
+      });
+  });
 });

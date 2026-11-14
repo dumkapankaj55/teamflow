@@ -3,7 +3,7 @@ const validateEnvironment = require('../config/validateEnvironment');
 describe('production environment validation', () => {
   const keys = [
     'NODE_ENV', 'MONGODB_URI', 'ACCESS_TOKEN_SECRET', 'CORS_ORIGINS', 'CLIENT_URL', 'PASSWORD_RESET_URL', 'REQUIRE_EMAIL_VERIFICATION',
-    'RESEND_API_KEY', 'RESEND_FROM_EMAIL', 'SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD',
+    'RESEND_API_KEY', 'RESEND_FROM_EMAIL', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASSWORD', 'SMTP_FROM',
     'COOKIE_SECURE', 'COOKIE_SAME_SITE', 'TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY',
   ];
   const original = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
@@ -16,9 +16,7 @@ describe('production environment validation', () => {
       COOKIE_SECURE: 'true', COOKIE_SAME_SITE: 'none',
       TURNSTILE_SITE_KEY: 'real-site-key', TURNSTILE_SECRET_KEY: 'real-secret-key', REQUIRE_EMAIL_VERIFICATION: 'true',
     });
-    delete process.env.SMTP_HOST;
-    delete process.env.SMTP_USER;
-    delete process.env.SMTP_PASSWORD;
+    for (const key of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASSWORD', 'SMTP_FROM']) delete process.env[key];
   });
 
   afterAll(() => {
@@ -45,6 +43,16 @@ describe('production environment validation', () => {
 
   it('requires Resend credentials and sender configuration', () => {
     delete process.env.RESEND_API_KEY;
+    expectConfigurationError('ENVIRONMENT_NOT_CONFIGURED');
+  });
+
+  it('does not accept SMTP credentials in place of Resend credentials', () => {
+    delete process.env.RESEND_API_KEY;
+    delete process.env.RESEND_FROM_EMAIL;
+    Object.assign(process.env, {
+      SMTP_HOST: 'smtp.example.test', SMTP_PORT: '587', SMTP_SECURE: 'false',
+      SMTP_USER: 'user', SMTP_PASSWORD: 'password', SMTP_FROM: 'TeamFlow <no-reply@example.test>',
+    });
     expectConfigurationError('ENVIRONMENT_NOT_CONFIGURED');
   });
 

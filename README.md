@@ -177,6 +177,8 @@ npm run dev:server
 
 `client/.env.example` contains `VITE_API_URL` and the public `VITE_TURNSTILE_SITE_KEY`. Local API requests use Vite's `/api/v1` proxy so the app works from localhost and a private LAN address. Local defaults use Cloudflare's test keys. Set the matching real site key in Vercel for production; keep the secret only in Render's environment settings.
 
+For local Docker Compose email delivery, set `RESEND_API_KEY` and a verified `RESEND_FROM_EMAIL` in the root `.env` file. Keep the API key on the server; never use a `VITE_` variable for it.
+
 Stripe uses hosted Checkout, so no publishable key is needed in the browser. Configure the Stripe test secret, a webhook signing secret, and the Stripe Price ID(s) on the API. For local webhook testing, run `stripe listen --forward-to localhost:5000/api/v1/billing/webhook` and use the emitted `whsec_...` value as `STRIPE_WEBHOOK_SECRET`. Without these credentials paid checkout remains unavailable; Free plan selection and access remain available.
 
 ## Commands
@@ -194,7 +196,7 @@ npm audit               # dependency vulnerability report
 
 The API tests require a reachable MongoDB configured through `MONGODB_URI`; they create and remove a uniquely named test database. The client tests run in jsdom. Playwright uses a separate API port and database (`E2E_MONGODB_URI`) so it does not reuse the local application database. Install the browser with `npx playwright install chromium` before running E2E tests.
 
-To run the Docker Compose stack, copy `.env.example` to `.env`, set a long random `ACCESS_TOKEN_SECRET`, then run `docker compose up --build`. The client is available at `http://localhost:5173`; Compose keeps MongoDB private to its network and persists data in a named volume. For local Docker use, Compose sets email verification off and uses development Turnstile keys; configure real email, CAPTCHA, cookies, origins, and Stripe settings before production deployment.
+To run the Docker Compose stack, copy `.env.example` to `.env`, set a long random `ACCESS_TOKEN_SECRET`, then run `docker compose up --build`. The client is available at `http://localhost:5173`; Compose keeps MongoDB private to its network and persists data in a named volume. For local Docker use, Compose sets email verification off and uses development Turnstile keys; add Resend credentials to send email, and configure real email, CAPTCHA, cookies, origins, and Stripe settings before production deployment.
 
 ## API reference
 
@@ -249,7 +251,7 @@ Deployment descriptors are included in `render.yaml` (API) and `client/vercel.js
 5. Set Stripe secret key, webhook signing secret, and configured Price IDs in the API environment if billing is enabled. Point Stripe's webhook to `/api/v1/billing/webhook`. Set `SENTRY_DSN` only if error reporting is enabled.
 6. Verify the deployed `/api/v1/health` and `/api/v1/health/ready`, register and verify email, login, refresh and logout, password reset email delivery, invitation acceptance, workspace isolation, live notifications, and billing webhook delivery.
 
-This repository includes deployment descriptors and a GitHub Actions CI workflow for linting, API and client tests, production build, dependency audit, and Playwright. It has not been deployed: access to Atlas, Render, Vercel, SMTP, Stripe, and the public production URLs is not available in this workspace. File uploads and storage accounting are not implemented yet, so billing reports storage tracking as unavailable and does not present a storage quota as enforced.
+This repository includes deployment descriptors and a GitHub Actions CI workflow for linting, API and client tests, production build, dependency audit, and Playwright. It has not been deployed: access to Atlas, Render, Vercel, Resend, Stripe, and the public production URLs is not available in this workspace. File uploads and storage accounting are not implemented yet, so billing reports storage tracking as unavailable and does not present a storage quota as enforced.
 
 ## Future improvements
 

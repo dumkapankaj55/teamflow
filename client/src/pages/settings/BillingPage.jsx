@@ -122,7 +122,7 @@ export default function BillingPage() {
                       <label className="field-label">Tell us about your team
                         <textarea value={salesMessage} onChange={(event) => setSalesMessage(event.target.value)} minLength="10" maxLength="2000" rows="4" required />
                       </label>
-                      {!billing.salesEnquiryAvailable && <small className="field-help">Sales email is not configured. Set SALES_EMAIL and SMTP_* on the server to send enquiries.</small>}
+                      {!billing.salesEnquiryAvailable && <small className="field-help">Sales email is not configured. Set SALES_EMAIL, RESEND_API_KEY, and RESEND_FROM_EMAIL on the server to send enquiries.</small>}
                       <Button type="submit" disabled={salesBusy || salesMessage.trim().length < 10}>{salesBusy ? 'Sending…' : 'Send enquiry'}</Button>
                     </form>}
                   </> : <Button disabled>Configure Stripe billing</Button>}
