@@ -48,7 +48,7 @@ function findOneResult(value) {
 }
 
 describe('billing service Stripe integration', () => {
-  const environmentKeys = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_PRO', 'STRIPE_PRICE_ENTERPRISE', 'CLIENT_URL', 'SALES_EMAIL', 'SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD'];
+  const environmentKeys = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_PRO', 'STRIPE_PRICE_ENTERPRISE', 'CLIENT_URL', 'SALES_EMAIL', 'RESEND_API_KEY', 'RESEND_FROM_EMAIL'];
   const originalEnvironment = Object.fromEntries(environmentKeys.map((key) => [key, process.env[key]]));
 
   beforeEach(() => {
@@ -60,9 +60,8 @@ describe('billing service Stripe integration', () => {
       STRIPE_PRICE_ENTERPRISE: 'price_enterprise',
       CLIENT_URL: 'https://teamflow.example.test',
       SALES_EMAIL: 'sales@example.test',
-      SMTP_HOST: 'smtp.example.test',
-      SMTP_USER: 'teamflow',
-      SMTP_PASSWORD: 'local-test-password',
+      RESEND_API_KEY: 're_test_local_only',
+      RESEND_FROM_EMAIL: 'TeamFlow <no-reply@example.test>',
     });
     Stripe.mockImplementation(() => stripeApi);
     Subscription.findOne.mockReturnValue(findOneResult(null));

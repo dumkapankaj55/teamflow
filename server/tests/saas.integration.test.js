@@ -319,11 +319,10 @@ describe('TeamFlow SaaS workflows', () => {
 
   it('does not expose an invitation URL when production email delivery is unavailable', async () => {
     const admin = await register({ organizationName: 'No Email Workspace' });
-    const environment = Object.fromEntries(['NODE_ENV', 'SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD'].map((key) => [key, process.env[key]]));
+    const environment = Object.fromEntries(['NODE_ENV', 'RESEND_API_KEY', 'RESEND_FROM_EMAIL'].map((key) => [key, process.env[key]]));
     process.env.NODE_ENV = 'production';
-    delete process.env.SMTP_HOST;
-    delete process.env.SMTP_USER;
-    delete process.env.SMTP_PASSWORD;
+    delete process.env.RESEND_API_KEY;
+    delete process.env.RESEND_FROM_EMAIL;
     let response;
     try {
       response = await request(app).post(`/api/v1/organizations/${admin.organization._id}/invitations`)

@@ -419,14 +419,19 @@ async function listInvoices(organizationId) {
 
 async function sendEnterpriseEnquiry({ organization, user, message }) {
   if (!process.env.SALES_EMAIL || !mailerService.isConfigured()) {
-    throw new AppError('Enterprise sales enquiries are not configured. Set SALES_EMAIL and the SMTP_* variables.', 503, 'SALES_CONTACT_NOT_CONFIGURED');
+    throw new AppError('Enterprise sales enquiries are not configured. Set SALES_EMAIL, RESEND_API_KEY, and RESEND_FROM_EMAIL.', 503, 'SALES_CONTACT_NOT_CONFIGURED');
   }
-  const sent = await mailerService.sendEmail({
-    to: process.env.SALES_EMAIL,
-    replyTo: user.email,
-    subject: 'TeamFlow Enterprise plan enquiry',
-    text: `Workspace: ${organization.name}\nWorkspace ID: ${organization._id}\nContact: ${user.name} <${user.email}>\n\n${message}`,
-  });
+  let sent;
+  try {
+    sent = await mailerService.sendEmail({
+      to: process.env.SALES_EMAIL,
+      replyTo: user.email,
+      subject: 'TeamFlow Enterprise plan enquiry',
+      text: `Workspace: ${organization.name}\nWorkspace ID: ${organization._id}\nContact: ${user.name} <${user.email}>\n\n${message}`,
+    });
+  } catch (_error) {
+    throw new AppError('The sales enquiry could not be sent. Please try again later.', 503, 'SALES_CONTACT_UNAVAILABLE');
+  }
   if (!sent) throw new AppError('The sales enquiry could not be sent. Please try again later.', 503, 'SALES_CONTACT_UNAVAILABLE');
   return { sent: true };
 }

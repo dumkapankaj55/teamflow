@@ -2,6 +2,8 @@
 
 TeamFlow is a multi-tenant project management and team collaboration SaaS built with the MERN stack. Organizations manage projects, tasks, teammates, comments, and progress in separate workspaces. The repository includes the React application, REST API, MongoDB models, automated tests, and deployment configuration for Vercel, Render, and MongoDB Atlas.
 
+For production deployment to Vercel, Render, and MongoDB Atlas, see [DEPLOYMENT.md](./DEPLOYMENT.md).
+
 ## Features
 
 - Responsive product landing page, login, registration, password recovery, and invitation acceptance.
@@ -167,11 +169,11 @@ npm run dev:server
 | `COOKIE_SECURE`, `COOKIE_SAME_SITE` | Cookie transport policy; production requires `true` and `none` for separate Vercel/Render origins |
 | `CORS_ORIGINS` | Comma-separated allowed client origins |
 | `CLIENT_URL`, `PASSWORD_RESET_URL` | Public client URLs used in email links |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | SMTP delivery for password reset and organization invitations |
+| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Resend delivery for email verification, password reset, workspace invitations, and sales enquiries |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile keys; production requires real keys and rejects test keys |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe test/live secret and webhook signing secret; both are required to enable hosted checkout |
 | `STRIPE_PRICE_PRO`, `STRIPE_PRICE_ENTERPRISE` | Stripe Price IDs for the corresponding subscription plans |
-| `SALES_EMAIL` | Recipient for Enterprise enquiries; requires the SMTP settings above |
+| `SALES_EMAIL` | Recipient for Enterprise enquiries; requires the Resend settings above |
 
 `client/.env.example` contains `VITE_API_URL` and the public `VITE_TURNSTILE_SITE_KEY`. Local API requests use Vite's `/api/v1` proxy so the app works from localhost and a private LAN address. Local defaults use Cloudflare's test keys. Set the matching real site key in Vercel for production; keep the secret only in Render's environment settings.
 
@@ -241,7 +243,7 @@ Project list filters include `search`, `status`, and `sort`. Task states are `TO
 Deployment descriptors are included in `render.yaml` (API) and `client/vercel.json` (SPA routing). Deploy the database first, then the API, then the client:
 
 1. Create a MongoDB Atlas cluster and allow the Render service to connect. Use a dedicated database user and keep its URI private.
-2. Create a Render web service from this repository using `render.yaml`. Add the production values for `MONGODB_URI`, `ACCESS_TOKEN_SECRET`, the SMTP settings, and the Vercel origins/URLs. Production startup rejects missing email settings, a short access secret, insecure cookies, or incompatible cross-site cookie settings.
+2. Create a Render web service from this repository using `render.yaml`. Add the production values for `MONGODB_URI`, `ACCESS_TOKEN_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and the Vercel origins/URLs. Production startup rejects missing email settings, a short access secret, insecure cookies, or incompatible cross-site cookie settings.
 3. Deploy `client/` to Vercel. Set `VITE_API_URL` to the Render API URL plus `/api/v1` and add the Vercel client origin to Render's `CORS_ORIGINS`.
 4. Set `CLIENT_URL` and `PASSWORD_RESET_URL` to the deployed client origin and reset route. Set the matching real Turnstile site key in Vercel and secret key in Render. Verify that Render's `COOKIE_SECURE=true` and `COOKIE_SAME_SITE=none` are configured for cross-site HTTPS cookies.
 5. Set Stripe secret key, webhook signing secret, and configured Price IDs in the API environment if billing is enabled. Point Stripe's webhook to `/api/v1/billing/webhook`. Set `SENTRY_DSN` only if error reporting is enabled.

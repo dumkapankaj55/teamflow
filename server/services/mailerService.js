@@ -1,24 +1,29 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+const AppError = require('../utils/AppError');
+const { logger } = require('../config/logger');
 
 function isConfigured() {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD);
-}
-
-function transporter() {
-  if (!isConfigured()) return null;
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD },
-  });
+  return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
 }
 
 async function sendEmail({ to, subject, text, html, replyTo }) {
-  const mailTransport = transporter();
-  if (!mailTransport) return false;
-  await mailTransport.sendMail({ from: process.env.SMTP_FROM || 'TeamFlow <no-reply@example.com>', to, subject, text, html, ...(replyTo ? { replyTo } : {}) });
-  return true;
+  if (!isConfigured()) return false;
+  try {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { error } = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL,
+      to,
+      subject,
+      text,
+      html,
+      ...(replyTo ? { replyTo } : {}),
+    });
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    logger.warn({ errorName: error?.name }, 'Resend email delivery failed');
+    throw new AppError('Email delivery failed. Please try again later.', 503, 'EMAIL_DELIVERY_UNAVAILABLE');
+  }
 }
 
 module.exports = { isConfigured, sendEmail };

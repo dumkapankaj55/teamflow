@@ -31,7 +31,8 @@ const cookieName = () => process.env.COOKIE_NAME || 'teamflow_refresh';
 const emailVerificationRequired = () => process.env.REQUIRE_EMAIL_VERIFICATION === 'true';
 
 function verificationUrl(token) {
-  return `${process.env.CLIENT_URL || 'http://localhost:5173'}/verify-email?token=${encodeURIComponent(token)}`;
+  const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
+  return `${clientUrl}/verify-email?token=${encodeURIComponent(token)}`;
 }
 
 async function deliverVerificationEmail(user, token) {
@@ -238,7 +239,8 @@ async function forgotPassword(email) {
   user.resetAttempts = 0;
   user.resetTokenExpiresAt = expiresAt;
   await user.save();
-  const resetUrl = `${process.env.PASSWORD_RESET_URL || 'http://localhost:5173/reset-password'}?token=${encodeURIComponent(token)}`;
+  const resetBaseUrl = (process.env.PASSWORD_RESET_URL || 'http://localhost:5173/reset-password').replace(/\/+$/, '');
+  const resetUrl = `${resetBaseUrl}?token=${encodeURIComponent(token)}`;
   let sent = false;
   try {
     sent = await sendEmail({
@@ -250,7 +252,7 @@ async function forgotPassword(email) {
   } catch (error) {
     logger.warn({ errorName: error?.name }, 'Password reset email delivery failed');
   }
-  if (!sent && process.env.NODE_ENV === 'production') logger.error('Password reset email is not configured; set SMTP_* variables.');
+  if (!sent && process.env.NODE_ENV === 'production') logger.error('Password reset email is not configured; set RESEND_API_KEY and RESEND_FROM_EMAIL.');
   return process.env.NODE_ENV === 'production' ? genericResponse : { ...genericResponse, debugResetUrl: resetUrl, debugOtp: otp };
 }
 

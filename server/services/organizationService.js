@@ -84,7 +84,8 @@ async function createInvitation({ organizationId, actor, email, role }) {
     throw error;
   }
   const organization = await Organization.findById(organizationId).select('name');
-  const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/accept-invitation?token=${encodeURIComponent(token)}`;
+  const clientUrl = (process.env.CLIENT_URL || 'http://localhost:5173').replace(/\/+$/, '');
+  const inviteUrl = `${clientUrl}/accept-invitation?token=${encodeURIComponent(token)}`;
   let sent;
   try {
     sent = await sendEmail({
@@ -96,12 +97,13 @@ async function createInvitation({ organizationId, actor, email, role }) {
   } catch (error) {
     await Invitation.deleteOne({ _id: invitation._id });
     await billingService.releaseMemberSeat(organizationId);
-    throw error;
+    logger.warn({ errorName: error?.name }, 'Invitation email delivery failed');
+    throw new AppError('Invitation email could not be sent. Please try again later.', 503, 'EMAIL_DELIVERY_UNAVAILABLE');
   }
   if (!sent && process.env.NODE_ENV === 'production') {
     await Invitation.deleteOne({ _id: invitation._id });
     await billingService.releaseMemberSeat(organizationId);
-    logger.error('Invitation email is not configured; set SMTP_* variables.');
+    logger.error('Invitation email is not configured; set RESEND_API_KEY and RESEND_FROM_EMAIL.');
     throw new AppError('Invitation email could not be sent. Please try again later.', 503, 'EMAIL_DELIVERY_UNAVAILABLE');
   }
   if (existingUser) await notify({ organization: organizationId, user: existingUser._id, type: 'INVITATION_RECEIVED', title: 'You’ve been invited', message: `${actor.user.name} invited you to join ${organization.name}.` });
